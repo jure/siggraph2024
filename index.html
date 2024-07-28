@@ -389,9 +389,9 @@
         ${event.event_link ? `<a href='${event.event_link}'><h3>${event.event_title}</h3></a>` : `<h3>${event.event_title}</h3>`}
         <p><strong>Time:</strong> ${timeSpan(event)}</p>
         <p><strong>Location:</strong> <a href="${event.location_link}" target="_blank">${event.location}</a></p>
-        ${event.presenters.length > 0 && `
+        ${event.presenters.length > 0 ? `
         <p><strong>Presenters:</strong></p>
-        <ul>${event.presenters.map(presenter => `<li><a href="${presenter.link}" target="_blank">${presenter.name}</a></li>`).join('')}</ul>`}
+        <ul>${event.presenters.map(presenter => `<li><a href="${presenter.link}" target="_blank">${presenter.name}</a></li>`).join('')}</ul>` : ''}
         <p><strong>Tags:</strong> ${event.tags.join(', ')}</p>
         ${event.in_agenda ? `<button class="remove" onclick="removeFromMyAgenda(${event.id})">Remove from my agenda</button>` :
             `<button onclick="addToMyAgenda(${event.id}, '${event.event_title}', '${event.event_link}', '${event.s_utc}', '${event.e_utc}', '${event.location}', '${event.location_link}')">Add to my agenda</button>`
