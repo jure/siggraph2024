@@ -109,11 +109,11 @@
       background-color: #0056b3;
     }
 
-    .my-agenda-item button {
+    .my-agenda-item button, .event-item button.remove {
       background-color: #dc3545;
     }
 
-    .my-agenda-item button:hover {
+    .my-agenda-item button:hover, .event-item button.remove:hover {
       background-color: #a71d2a;
     }
 
@@ -208,7 +208,15 @@
     let myShowPastEvents;
     let searchString = '';
     // Assign each event an incrementing id
-    events.forEach((event, index) => event.id = index);
+    const myAgendaStorage = JSON.parse(localStorage.getItem('myAgenda')) || [];
+    events.forEach((event, index) => {
+      event.id = index
+      // Check if event is in localStorage
+      const existsInMyAgenda = myAgendaStorage.find(e => e.id === index);
+      if (existsInMyAgenda) {
+        event.in_agenda = true;
+      }
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
       const searchInput = document.getElementById('searchInput');
@@ -220,24 +228,11 @@
       const searchTab = document.getElementById('searchTab');
       showPastEvents = document.getElementById('showPastEvents');
       myShowPastEvents = document.getElementById('myShowPastEvents');
-      
+
       searchInput.addEventListener('input', () => {
         searchString = searchInput.value.toLowerCase();
         search(searchString);
       });
-
-      function search(searchTerm) {
-        const filteredEvents = events.filter(event => {
-          const eventDetails = `
-        ${event.event_title.toLowerCase()}
-        ${event.location.toLowerCase()}
-        ${event.presenters.map(presenter => presenter.name.toLowerCase()).join(' ')}
-        ${event.tags.join(' ').toLowerCase()}
-      `;
-          return eventDetails.includes(searchTerm);
-        });
-        displayEvents(filteredEvents, agendaList);
-      }
 
       showPastEvents.addEventListener('change', () => {
         search(searchString);
@@ -270,7 +265,7 @@
       }
 
       // Initial display of all events and my agenda
-      displayEvents(events, agendaList);
+      displayEvents(events);
       displayMyAgenda();
       checkDefaultTab();
 
@@ -278,91 +273,118 @@
       setInterval(updateBackgrounds, 60000);
     });
 
-    function addToMyAgenda(id, eventTitle, event_link, s_utc, e_utc, location, location_link) {
-        const myAgenda = JSON.parse(localStorage.getItem('myAgenda')) || [];
-        // Do not add if already in my agenda
-        if (myAgenda.some(event => event.id === id)) return;
-        const event = { id, eventTitle, event_link, s_utc, e_utc, location, location_link };
-        myAgenda.push(event);
-        localStorage.setItem('myAgenda', JSON.stringify(myAgenda));
-        // Update number in my agenda tab button
-        updateAgendaTabButton();
-        displayMyAgenda();
+    function search(searchTerm) {
+        const filteredEvents = events.filter(event => {
+          const eventDetails = `
+        ${event.event_title.toLowerCase()}
+        ${event.location.toLowerCase()}
+        ${event.presenters.map(presenter => presenter.name.toLowerCase()).join(' ')}
+        ${event.tags.join(' ').toLowerCase()}
+      `;
+          return eventDetails.includes(searchTerm);
+        });
+        displayEvents(filteredEvents);
       }
+
+    function recordEventAgendaStatus(id, state) {
+      const event = events.find(event => event.id === id);
+      if (event) {
+        event.in_agenda = state;
+      }
+    }
+
+    function addToMyAgenda(id, eventTitle, event_link, s_utc, e_utc, location, location_link) {
+      const myAgenda = JSON.parse(localStorage.getItem('myAgenda')) || [];
+      // Do not add if already in my agenda
+      if (myAgenda.some(event => event.id === id)) return;
+      const event = { id, eventTitle, event_link, s_utc, e_utc, location, location_link };
+      myAgenda.push(event);
+      localStorage.setItem('myAgenda', JSON.stringify(myAgenda));
+      // Update number in my agenda tab button
+      // Mark as added in the main events list
+      recordEventAgendaStatus(id, true);
+      updateAgendaTabButton();
+      displayMyAgenda();
+      search(searchString);
+    }
 
     function updateAgendaTabButton() {
-        const myAgenda = JSON.parse(localStorage.getItem('myAgenda')) || [];
-        document.getElementById('myAgendaTabButton').innerText = `My Agenda (${myAgenda.length})`;
-      }
+      const myAgenda = JSON.parse(localStorage.getItem('myAgenda')) || [];
+      document.getElementById('myAgendaTabButton').innerText = `My Agenda (${myAgenda.length})`;
+    }
 
-      function removeFromMyAgenda(id) {
-        const myAgenda = JSON.parse(localStorage.getItem('myAgenda')) || [];
-        const updatedAgenda = myAgenda.filter(event => event.id !== id);
-        localStorage.setItem('myAgenda', JSON.stringify(updatedAgenda));
-        displayMyAgenda();
-      }
+    function removeFromMyAgenda(id) {
+      const myAgenda = JSON.parse(localStorage.getItem('myAgenda')) || [];
+      const updatedAgenda = myAgenda.filter(event => event.id !== id);
+      localStorage.setItem('myAgenda', JSON.stringify(updatedAgenda));
+      recordEventAgendaStatus(id, false);
+      displayMyAgenda();
+      search(searchString);
+    }
 
-      function displayMyAgenda() {
-        const myAgenda = JSON.parse(localStorage.getItem('myAgenda')) || [];
-        // Sort by start time
-        myAgenda.sort((a, b) => new Date(a.s_utc) - new Date(b.s_utc));
-        myAgendaList.innerHTML = '';
-        myAgenda.forEach(event => {
-          if(!myShowPastEvents.checked && new Date(event.e_utc) < new Date()) {
-            return;
-          }
-          const eventItem = document.createElement('div');
-          eventItem.className = 'my-agenda-item';
-          eventItem.innerHTML = `
+    function displayMyAgenda() {
+      const myAgendaList = document.getElementById('myAgendaList');
+      const myAgenda = JSON.parse(localStorage.getItem('myAgenda')) || [];
+      // Sort by start time
+      myAgenda.sort((a, b) => new Date(a.s_utc) - new Date(b.s_utc));
+      myAgendaList.innerHTML = '';
+      myAgenda.forEach(event => {
+        if (!myShowPastEvents.checked && new Date(event.e_utc) < new Date()) {
+          return;
+        }
+        const eventItem = document.createElement('div');
+        eventItem.className = 'my-agenda-item';
+        eventItem.innerHTML = `
         <div class="progress-background"></div>
         ${event.event_link ? `<a href="${event.event_link}"><h3>${event.eventTitle}</h3></a>` : `<h3>${event.eventTitle}</h3>`}
         <p><strong>Time:</strong> ${timeSpan(event)}</p>
         <p><strong>Location:</strong> <a href="${event.location_link}" target="_blank">${event.location}</a></p>
         <button onclick="removeFromMyAgenda(${event.id})">Remove</button>
       `;
-          myAgendaList.appendChild(eventItem);
-        });
-        updateBackgrounds();
-        updateAgendaTabButton();
-      }
-      function updateBackgrounds() {
-        const now = new Date();
-        document.querySelectorAll('.event-item, .my-agenda-item').forEach(item => {
-          const s_utc = new Date(item.querySelector('.time-info').getAttribute('data-utc').split(' - ')[0]);
-          const e_utc = new Date(item.querySelector('.time-info').getAttribute('data-utc').split(' - ')[1]);
-          const progressBackground = item.querySelector('.progress-background');
+        myAgendaList.appendChild(eventItem);
+      });
+      updateBackgrounds();
+      updateAgendaTabButton();
+    }
+    function updateBackgrounds() {
+      const now = new Date();
+      document.querySelectorAll('.event-item, .my-agenda-item').forEach(item => {
+        const s_utc = new Date(item.querySelector('.time-info').getAttribute('data-utc').split(' - ')[0]);
+        const e_utc = new Date(item.querySelector('.time-info').getAttribute('data-utc').split(' - ')[1]);
+        const progressBackground = item.querySelector('.progress-background');
 
-          if (now > s_utc && now < e_utc) {
-            const duration = e_utc - s_utc;
-            const elapsed = now - s_utc;
-            const percentage = (elapsed / duration) * 100;
-            progressBackground.style.top = `${-100 + percentage}%`;
-          } else if (now > e_utc) {
-            progressBackground.style.top = '0%';
-            item.style.opacity = 0.3;
+        if (now > s_utc && now < e_utc) {
+          const duration = e_utc - s_utc;
+          const elapsed = now - s_utc;
+          const percentage = (elapsed / duration) * 100;
+          progressBackground.style.top = `${-100 + percentage}%`;
+        } else if (now > e_utc) {
+          progressBackground.style.top = '0%';
+          item.style.opacity = 0.3;
 
-          } else {
-            progressBackground.style.top = '100%';
-          }
-        });
-      }
-
-      function filterPastEvents(eventList) {
-        const now = new Date();
-        return eventList.filter(event => new Date(event.e_utc) > now);
-      }
-
-      function displayEvents(eventList, container) {
-        container.innerHTML = '';
-        if (showPastEvents.checked) {
-          eventList = eventList;
         } else {
-          eventList = filterPastEvents(eventList);
+          progressBackground.style.top = '100%';
         }
-        eventList.forEach(event => {
-          const eventItem = document.createElement('div');
-          eventItem.className = 'event-item';
-          eventItem.innerHTML = `
+      });
+    }
+
+    function filterPastEvents(eventList) {
+      const now = new Date();
+      return eventList.filter(event => new Date(event.e_utc) > now);
+    }
+
+    function displayEvents(eventList) {
+      const container = document.getElementById('agendaList');
+      container.innerHTML = '';
+      if (showPastEvents.checked) {
+        eventList = eventList;
+      } else {
+        eventList = filterPastEvents(eventList);
+      }
+      eventList.forEach(event => {
+        const eventItem = document.createElement('div');
+        eventItem.className = 'event-item';
+        eventItem.innerHTML = `
         <div class="progress-background"></div>
         ${event.event_link ? `<a href='${event.event_link}'><h3>${event.event_title}</h3></a>` : `<h3>${event.event_title}</h3>`}
         <p><strong>Time:</strong> ${timeSpan(event)}</p>
@@ -371,19 +393,21 @@
         <p><strong>Presenters:</strong></p>
         <ul>${event.presenters.map(presenter => `<li><a href="${presenter.link}" target="_blank">${presenter.name}</a></li>`).join('')}</ul>`}
         <p><strong>Tags:</strong> ${event.tags.join(', ')}</p>
-        <button onclick="addToMyAgenda(${event.id}, '${event.event_title}', '${event.event_link}', '${event.s_utc}', '${event.e_utc}', '${event.location}', '${event.location_link}')">Add to My Agenda</button>
+        ${event.in_agenda ? `<button class="remove" onclick="removeFromMyAgenda(${event.id})">Remove from my agenda</button>` :
+            `<button onclick="addToMyAgenda(${event.id}, '${event.event_title}', '${event.event_link}', '${event.s_utc}', '${event.e_utc}', '${event.location}', '${event.location_link}')">Add to my agenda</button>`
+          }
       `;
-          container.appendChild(eventItem);
-        });
-        updateBackgrounds();
-      }
+        container.appendChild(eventItem);
+      });
+      updateBackgrounds();
+    }
 
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      function timeSpan(event) {
-        return `<span class="time-info" data-utc="${new Date(event.s_utc).toISOString()} - ${new Date(event.e_utc).toISOString()}">
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    function timeSpan(event) {
+      return `<span class="time-info" data-utc="${new Date(event.s_utc).toISOString()} - ${new Date(event.e_utc).toISOString()}">
               ${new Date(event.s_utc).toLocaleString()} - ${new Date(event.e_utc).toLocaleString().split(' ')[0] === new Date(event.s_utc).toLocaleString().split(' ')[0] ? new Date(event.e_utc).toLocaleString().split(' ')[1] : new Date(event.e_utc).toLocaleString()}
             (${days[new Date(event.s_utc).getDay()]})</span>`;
-      }
+    }
 
 
   </script>
