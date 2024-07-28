@@ -94,7 +94,7 @@
     a:hover {
       color: #007BFF;
     }
-    
+
     button {
       background-color: #007BFF;
       color: white;
@@ -304,6 +304,8 @@
 
       function displayMyAgenda() {
         const myAgenda = JSON.parse(localStorage.getItem('myAgenda')) || [];
+        // Sort by start time
+        myAgenda.sort((a, b) => new Date(a.s_utc) - new Date(b.s_utc));
         myAgendaList.innerHTML = '';
         myAgenda.forEach(event => {
           if(!myShowPastEvents.checked && new Date(event.e_utc) < new Date()) {
